@@ -1,0 +1,9 @@
+
+L_TMP = 100
+L_UNSET = -1
+L_BKD = 0
+L_CLUTTER = 1
+L_DOOR = 2
+L_HALL = 3
+L_ROOM = 4
+L_UNK = 5

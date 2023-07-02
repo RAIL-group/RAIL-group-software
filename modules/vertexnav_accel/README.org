@@ -1,0 +1,3 @@
+* VertexNav: Mapping by detecting vertices in polygonal maps (C++ additions)
+
+C++ code called by the =vertexnav= module. See the [[../vertexnav][VertexNav module]] for a full README.

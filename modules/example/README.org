@@ -1,0 +1,106 @@
+
+* RAIL-core Example Module
+
+This is a bare-bones module to illustrate how modules in the RAIL group should be structured.
+
+** Basic Usage
+
+This module provides a couple of simple make targets and tests to illustrate some basic functionality. In the top level directory, build the repository using =make build=. We provide two targets:
+
+- =make example-core= Create a simple image of a randomly generated matrix saved to =RAIL-core/data/example_module/demo_image.png=. Running with =XPASSTHROUGH=true= (e.g., =make example-core XPASSTHROUGH=true=) will instead visualize the plot, rather than writing it to file. Note that once the image exists, running =example-core= again will do nothing, so as to save on computation. In more complex environments, this can result in a significant computational savings. By default, this repository runs assuming that a GPU is available; use the argument =USE_GPU=false= to disable the GPU: i.e., =make example-core USE_GPU=false=)
+- =make example-clean= Remove the =RAIL-core/data/example_module= directory (after asking for confirmation).
+- =README.org= This file! README files can be written in either =.org= or GitHub Markdown syntax.
+
+** Overall Structure
+
+This module has the following structure:
+
+- =example= The main folder in which the code of this module is defined. This example module provides only a single function =gen_random_matrix= in Once the module is installed, this function can be accessed via =example.core.gen_random_matrix= (once =example= is imported).
+- =example.scripts= We also provide a scripts folder for running scripts specific to this module. We have included a single script that performs a simple function. The syntax for running the script can be found [[file:./Makefile.mk::7][in the makefile]].
+- =Makefile.mk= A =Makefile= for Make targets specific to this module or project. More details on this below.
+- =setup.py= A setup script that specifies how =pip= will build or install the module.
+- =tests= A folder for tests specific to this function. Running =make test= will run all tests in the repository, including these. More details below.
+
+*** Adding new modules
+
+By default, modules are not added to the build process nor are the make targets added to the central Makefile. For Docker, you must both copy and then build the repository. For the example module, this looks as follows:
+
+#+begin_src dockerfile
+COPY modules/example modules/example
+RUN pip3 install modules/example
+#+end_src
+
+For the Makefile, the =include= keyword appends the contents of another file at the location of the include. For the example module:
+
+#+begin_src makefile
+include modules/example/Makefile.mk
+#+end_src
+
+Since all the make targets are all effectively concatenated into a single Makefile, it is important to ensure that variable names and the names of targets will not conflict with one another. It is for this reason that all the names for the example module (and presumably others) all share a prefix =example-= with the other targets in their module. The only exception is the =make help= target, which is designed to be "extended" by other sub-Makefiles. This is done using the double-colon syntax that indicates that multiple definitions of the same target are to be combined, rather than overridden:
+
+#+begin_src makefile
+help::
+	@echo "Example Targets (from the example module)"
+	@echo "  example-core	Create a simple example image"
+	@echo "  example-clean	Deletes the simple example image"
+	@echo ""
+#+end_src
+
+Even though this definition of =help::= is only for the =example= module, running =make help= will display the help for all modules.
+
+** The Makefile: running code within Docker
+
+Though the "top level" Makefile exists in the main directory of the repository, each module can provide its own =Makefile.mk=, which is appended to the top-level Makefile via the GNU Make [[https://www.gnu.org/software/make/manual/html_node/Include.html][=include= syntax]]. This means that each of the "local" Makefiles effectively inherit the variables defined at the top level. Chief among these is the =$(DOCKER_PYTHON)= variable, which is used to run Python within the primary Docker container. Our Makefile uses this to provide two make targets that run python code within Docker.
+
+The first Make target, =example-core= creates a single image via a simple script included in =example.scripts=:
+
+#+begin_src makefile
+# This target is to make an image by calling a script within 'example'
+example-image = $(DATA_BASE_DIR)/example_module/demo_image.png
+$(example-image):
+	@mkdir -p $(DATA_BASE_DIR)/example_module
+	@$(DOCKER_PYTHON) -m example.scripts.gen_random_mat \
+		--image-name /data/example_module/demo_image.png
+
+# A high-level target that calls other targets with a more convenient name
+.PHONY: example-core
+example-core: $(example-image)
+#+end_src
+
+There are a few things to note about the construction of this target. First, we have created a separate target called =$(example-image)=. Make is, at its core, a build system: it's primary responsibility is to create files by running code. When those files exist, it decides the code to "create them" needs not be rerun. In this case, we have defined a variable =example-image= with a single filename in it, which is where our script will save the image. The target for =$(example-image)= runs a python script inside Docker and ultimately write that image to file. The =example-core= target specifies =$(example-image)= (our image) as its only dependency, via the following syntax:
+
+#+begin_src makefile
+.PHONY: example-core
+example-core: $(example-image)
+#+end_src
+
+This code specifies that (1) =example-core= is "phony" (i.e., Make is not expecting that running this code will produce a file), (2) that running =example-core= does not execute any code of its own, and (3) that =example-core= requires =$(example-image)= to be completed before it is considered complete. If the file specified by =$(example-image)= already exists, Make will respond "nothing to be done" for =example-core=. Otherwise, Make will run the target defined by =$(example-image)=, presumably creating that file.
+
+We finally provide another "clean" target as =example-clean=, which removes the image file we created (and its parent directory).
+
+** The Tests: debugging and testing code
+
+We include a couple of very simple tests in =tests/test_example.py=. Tests are run via [[https://docs.pytest.org/][pytest]]. Pytest looks for tests in files that begin with =test_= and proceeds to run functions beginning with =test_= inside those functions. Tests are a fantastic way to ensure your code runs as expected and also to develop new ideas. Run =make test= in the top-level directory to run all tests across modules; set the =PYTEST_FILTER= to filter which tests are run: =make test PYTEST_FILTER=test_example= will run only the tests that include the string =test_example=, which should limit the scope to this module. Pytest will run through all the tests, reporting which succeed or fail. Once complete, pytest will produce an log (as an HTML file) in =data/test_logs= for more convenient browsing.
+
+Our first test runs the =get_random_matrix= function for a few different arguments and confirms that the random matrices have the correct shape and that their values are within expected bounds. We reproduce it here in its entirety:
+
+#+begin_src python
+import example
+import pytest
+
+@pytest.mark.parametrize("mat_shape", [(1, 4), (2, 2), (2,), (1, 2, 3, 4)])
+def test_get_random_matrix_is_correct_size(mat_shape):
+    mat = example.core.get_random_matrix(mat_shape)
+    assert mat.shape == mat_shape
+    assert mat.min() >= 0.0
+    assert mat.max() <= 1.0
+#+end_src
+
+The =parametrize= decorator provided by the =pytest= package has been used to run the test for multiple sets of arguments, reusing the existing code rather than making duplicate tests for each. The four tests are run separately, allowing us to confirm that each runs as expected in isolation.
+
+Our second test relies on a "test fixture", a reusable block of code defined in =modules/conftest.py=. This "fixture" defines the =do_debug_plot= variable derived from the =XPASSTHROUGH= command line argument. Fixtures are designed to run some code before the test is run and provide their output as input arguments to the test. This can be incredibly handy for defining code that sets up an object or environment and is reused across multiple tests. For this test, the =do_debug_plot= argument specifies whether or not we should plot something in the middle of the test, incredibly useful if you use tests as part of your development and debugging process (as you probably should)! In this case, I have some plotting code that I normally don't want to run, so that the tests run from start-to-finish without interruption, but that I also don't want to remove, so that I can visualize the function output when I so choose. When running all the tests via =make test=, the =test_optional_demo_plot= will automatically pass, yet setting =XPASSTHROUGH=true= will run the plotting code inside the test. Try it with the following:
+
+#+begin_src bash
+# Run plotting demo (without GPU [optional])
+make test USE_GPU=false XPASSTHROUGH=true PYTEST_FILTER=test_optional_demo_plot
+#+end_src

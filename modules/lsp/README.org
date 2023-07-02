@@ -1,0 +1,86 @@
+* LSP: Learning over Subgoals Planning
+
+Algorithmic code pertaining to the Learning over Subgoals Planning algorithm for learning-augmented, model-based planning in partially-mapped environments. This module reproduces core algorithm and results first presented in the following paper:
+
+Stein, Christopher Bradley, and Nicholas Roy. "Learning over Subgoals for Efficient Navigation of Structured, Unknown Environments". In: Conference on Robot Learning (CoRL). 2018. [[http://proceedings.mlr.press/v87/stein18a.html][paper]], [[https://youtu.be/4eHdGUoLlpg][talk, 14 min]]. [Best Paper Finalist]
+
+#+begin_src bibtex
+@inproceedings{stein2018learning,
+  title={Learning over subgoals for efficient navigation of structured, unknown environments},
+  author={Stein, Gregory J and Bradley, Christopher and Roy, Nicholas},
+  booktitle={Conference on Robot Learning (CoRL)},
+  pages={213--222},
+  year={2018},
+}
+#+end_src
+
+Readers are referred to the paper for algorithmic details.
+
+See also the Jupyter notebook-based onboarding tutorials discussed in the top-level README, as they make heavy use of the tools provided by this module.
+
+** Usage
+*** Reproducing Results
+
+Note: =make build= (see top-level README) must be successfully run before running the following commands.
+
+The =Makefile.mk= provides multiple targets for reproducing results.
+- =make lsp-maze= will generate results from our Guided Maze environment, in which a green path on the ground indicates the correct route to the unseen goal. The target first generates training data (via optimistic planning through similar environments), then trains a neural network to predict subgoal properties (predictions about the goodness of actions that enter unseen space), then evaluates performance using the trained neural network. Upon completing evaluation, it generates statistics and a scatterplot comparing the results with and without the learned model.
+- =make lsp-office= will generate results in the =office2= environment: procedurally generated hallway-like maps. The process is similar to the above.
+
+Both targets are run in single-threaded mode by default, however both data generation and evaluation can be run on multiple seeds in parallel. As such, running =make lsp-maze -j3= will run three concurrent instances. As data generation has a smaller VRAM footprint than does evaluation, it is often possible to run more concurrent instances specifically for data generation:
+
+#+begin_src bash
+make build
+make lsp-maze-data-gen -j6
+make lsp-maze -j3
+#+end_src
+
+GNU Make keeps track of progress, so if (for whatever reason) the code is stopped during a run. Rerunning the above commands will resume where it left off, without the need to redo any of the completed data generation, training, or evaluation instances.
+
+For the =maze= environment, running this code produces the following results plot, which demonstrates (expectedly) significant improvement over the non-learned baseline:
+
+[[./resources/images/results_maze_dbg.png]]
+
+*** The Planner and PlanningLoop Classes
+
+The =Planner= class provides a relatively simple API for updating an internal "state of the world" and computing which subgoal the planner recommends. The planner classes are most easily used in tandem with the =PlanningLoop= class also provided alongside the =lsp.planning= module. They are most often used in scripts to emulate a robot iteratively receiving data, updating its map and plan, and then taking action.
+
+For example, the following code shows how to generate data using the =KnownSubgoalPlanner= class:
+
+#+begin_src python
+  known_planner = lsp.planners.KnownSubgoalPlanner(
+      goal=goal, known_map=known_map, args=args,
+      do_compute_weightings=True)
+
+  planning_loop = lsp.planners.PlanningLoop(goal,
+                                            known_map,
+                                            simulator,
+                                            unity_bridge,
+                                            robot,
+                                            args,
+                                            verbose=True)
+
+  for counter, step_data in enumerate(planning_loop):
+      # Update the planner objects
+      known_planner.update(
+          {'image': step_data['image']},
+          step_data['robot_grid'],
+          step_data['subgoals'],
+          step_data['robot_pose'],
+          step_data['visibility_mask'])
+
+      # Get and write the data
+      subgoal_training_data = known_planner.get_subgoal_training_data()
+      lsp.utils.data.write_training_data_to_pickle(
+          subgoal_training_data,
+          step_counter=known_planner.update_counter,
+          args=known_planner.args)
+
+      if not do_plan_with_naive:
+          planning_loop.set_chosen_subgoal(
+              known_planner.compute_selected_subgoal())
+#+end_src
+
+At every iteration, the =planning_loop= class yields the =step_data= dictionary, which contains the information needed to update the =known_planner=. The =known_planner= contains functionality to generate training data, with labels generated from the known map. At the end, the known planner can be optionally used to set the "chosen subgoal" of the =planning_loop=, which the =planning_loop= object will use to plan for the next step and will therefore follow the plan chosen by the known planner. If the chosen subgoal is not set, the =planning_loop= will simply plan using Dijkstra's algorithm (as if all unseen space were unoccupied).
+
+More examples of how to use the =Planner= classes can be found in the =lsp.scripts= for data generation and evaluation and in =tests.test_lsp_evaluate=.

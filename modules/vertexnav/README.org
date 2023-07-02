@@ -1,0 +1,36 @@
+* VertexNav: Mapping by detecting vertices in polygonal maps
+
+Algorithmic code pertaining to monocular mapping, by detecting structural vertices in panoramic images and fusing them into a polygonal map. Results include experiments for both a single robot and a 3-robot, centrally coordinated team. This module reproduces core algorithm and results first presented in the following paper:
+
+Gregory J. Stein, Christopher Bradley, Victoria Preston, and Nicholas Roy. "Enabling Topological Planning with Monocular Vision." In: International Conference on Robotics and Automation (ICRA). 2020. [[https://arxiv.org/abs/2003.14368][paper]], [[https://youtu.be/UVZ3UcK6MhI][talk (10 min)]].
+
+#+begin_src bibtex
+@inproceedings{stein2020gapnav,
+  author =       {Gregory J. Stein and Christopher Bradley and Victoria Preston
+                  and Nicholas Roy},
+  booktitle =    {International Conference on Robotics and Automation (ICRA)},
+  title =        {Enabling Topological Planning with Monocular Vision},
+  year =         2020,
+  keywords =     {topological mapping, topological planning, frontiers,
+  multi-agent search, exploration, learning},
+}
+#+end_src
+
+Readers are referred to the paper for algorithmic details.
+
+** Usage
+
+Note: =make build= (see top-level README) must be successfully run before running the following commands.
+
+The =Makefile.mk= provides multiple targets for reproducing results.
+- =make vertexnav-dungeon= will generate results from our multi-room "Dungeon" environment for both a single robot and for a centrally-coordinated 3-robot team.
+
+Both targets are run in single-threaded mode by default, however both data generation and evaluation can be run on multiple seeds in parallel. As such, running =make vertexnav-dungeon -j3= will run three concurrent instances. As data generation has a smaller VRAM footprint than does evaluation, it is often possible to run more concurrent instances specifically for data generation:
+
+#+begin_src bash
+make build
+make vertexnav-dungeon-generate-data -j6
+make vertexnav-dungeon -j3
+#+end_src
+
+GNU Make keeps track of progress, so if (for whatever reason) the code is stopped during a run. Rerunning the above commands will resume where it left off, without the need to redo any of the completed data generation, training, or evaluation instances.

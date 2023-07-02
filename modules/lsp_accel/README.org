@@ -1,0 +1,3 @@
+* LSP: Learning over Subgoals Planning (C++ Code)
+
+C++ code called by the =lsp= module. See the [[../lsp][Learning over Subgoals Planning module]] for a full README.

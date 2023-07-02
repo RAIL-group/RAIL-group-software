@@ -1,0 +1,38 @@
+* LSP-GNN: Learning over Subgoals Planning using Graph Neural Network
+
+Algorithmic code pertaining to the LSP-GNN algorithm for learning-augmented, model-based planning using non-local information in partially-mapped environments. This module reproduces core algorithm and results presented in the following paper:
+
+Raihan Islam Arnob and Gregory J. Stein. "Improving Reliable Navigation under Uncertainty via Predictions Informed by Non-Local Information." International Conference on Intelligent Robots and Systems (IROS). 2023. *paper forthcoming*.
+
+#+begin_src bibtex
+@inproceedings{arnob2023lspgnn,
+  title={Improving Reliable Navigation under Uncertainty via Predictions Informed by Non-Local Information},
+  author={Arnob, Raihan Islam and Stein, Gregory J},
+  booktitle={International Conference on Intelligent Robots and Systems (IROS)},
+  year={2023},
+}
+#+end_src
+
+Readers are referred to the paper for algorithmic details.
+
+** Usage
+*** Reproducing Results
+
+Note: =make build= (see top-level README) must be successfully run before running the following commands.
+
+The =Makefile.mk= provides multiple targets for reproducing results.
+
+- =make lsp-gnn-jshaped= will generate results from our =J-Intersection= environment, in which the color of the non-local observation at the intersection indicates the correct route to the unseen goal. The target first generates training data (both with the known map and via optimistic planning through similar environments), then trains a graph neural network to predict subgoal properties (predictions about the goodness of actions that enter unseen space), then evaluates performance using the trained neural network. Upon completing evaluation, it generates statistics and a scatterplot comparing the results with and without the learned model.
+- =make lsp-gnn-ph= will generate results in the =Parallel Hallway= environment: procedurally generated parallel hallway-like maps. The process is similar to the above.
+- =make lsp-gnn-floorplans= * will generate results in the =University Building Floorplans= environment: real world university building floorplans. The process is similar to the above.
+- =make lsp-gnn= * will generate results in all three environments.
+
+/* In order for the floorplans or combined target the extracted version of university_building_floorplans must exist inside /data/lsp_gnn/
+
+All targets are run in single-threaded mode by default, however both data generation and evaluation can be run on multiple seeds in parallel. As such, running =make lsp-gnn-jshaped -j3= will run three concurrent instances. As data generation has a smaller VRAM footprint than does evaluation, it is often possible to run more concurrent instances specifically for data generation:
+
+#+begin_src bash
+make build
+make lsp-gnn-jshaped-data-gen -j6
+make lsp-gnn-jshaped -j3
+#+end_src
