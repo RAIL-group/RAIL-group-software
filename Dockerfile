@@ -74,8 +74,6 @@ COPY modules/lsp_xai modules/lsp_xai
 RUN pip3 install modules/lsp_xai
 COPY modules/lsp_gnn modules/lsp_gnn
 RUN pip3 install modules/lsp_gnn
-COPY modules/vertexnav_lsp modules/vertexnav_lsp
-RUN pip3 install modules/vertexnav_lsp
 COPY modules/mrlsp modules/mrlsp
 RUN pip3 install modules/mrlsp
 COPY modules/mrlsp_accel modules/mrlsp_accel
